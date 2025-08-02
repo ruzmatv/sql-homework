@@ -1,0 +1,182 @@
+-- 1. Create a temporary table named MonthlySales to store the total quantity sold and total revenue for each product in the current month.
+
+select * from products
+select * from sales
+
+CREATE TABLE #MonthlSales (
+    ProductID INT,
+    TotalQuantity INT,
+    TotalRevenue DECIMAL(18,2)
+);
+INSERT INTO #MonthlSales (ProductID, TotalQuantity, TotalRevenue)
+SELECT 
+    s.ProductID,
+    SUM(s.Quantity) AS TotalQuantity,
+    SUM(s.Quantity * p.Price) AS TotalRevenue
+FROM 
+    Sales s
+JOIN 
+    Products p ON s.ProductID = p.ProductID
+WHERE 
+    MONTH(s.SaleDate) = MONTH(GETDATE()) AND
+    YEAR(s.SaleDate) = YEAR(GETDATE())
+GROUP BY 
+    s.ProductID;
+
+SELECT * FROM #MonthlSales;
+
+-- 2. Create a view named vw_ProductSalesSummary that returns product info along with total sales quantity across all time.
+
+create view vw_productsalessummery  as
+select 
+p.productID,
+p.productname,
+p.category,
+isnull(sum(s.quantity),0)as totalquantitsold
+from products p
+left join
+sales s on p.productid =s.productID
+group by 
+p.productID,p.productname,p.category
+
+select * from vw_productsalessummery 
+
+-- 3.  Create a function named fn_GetTotalRevenueForProduct(@ProductID INT)
+
+
+CREATE FUNCTION dbo.fn_GetTotalRevenueForProduct (
+    @ProductID INT
+)
+RETURNS DECIMAL(18, 2)
+AS
+BEGIN
+    DECLARE @TotalRevenue DECIMAL(18, 2);
+
+    SELECT @TotalRevenue = SUM(s.Quantity * p.Price)
+    FROM Sales s
+    JOIN Products p ON s.ProductID = p.ProductID
+    WHERE s.ProductID = @ProductID;
+
+    RETURN ISNULL(@TotalRevenue, 0);
+END;
+
+SELECT dbo.fn_GetTotalRevenueForProduct(1) AS TotalRevenue;
+
+-- 4. Create an function fn_GetSalesByCategory(@Category VARCHAR(50))
+
+create function dbo.fnGSBC(
+
+@category varchar(50)
+)
+returns int 
+as 
+begin
+declare @totalquantity int;
+select @totalquantity = sum(s.quantity)
+from sales s
+join products p on s.productID =p.productid
+where p.category =@category
+return isnull(@totalquantity,0)
+end
+
+select dbo.fnGSBC(1) as revenues
+
+-- 5. . You have to create a function that get one argument as input from user and the function should return 'Yes' if the input number is a prime number and 'No' otherwise. You can start it like this:
+
+create function dbo.fnisprime(@num int)
+returns varchar(3)
+as 
+begin
+if @num<2
+return 'no'
+declare @i int =2
+declare @limit int =floor(sqrt(@num))
+
+while @i <=@limit
+begin
+if @num%@i=0
+return 'no'
+set @i =@i +1
+end
+
+return 'yes'
+end
+
+select dbo.fnisprime(1) as total
+
+-- 6. Create a table-valued function named fn_GetNumbersBetween that accepts two integers as input:
+
+create function dbo.tablevalued(@num1 int,@num2 int)
+returns @numbers table(number int)
+as
+begin
+declare @current int=@num1
+
+while @current<=@num2
+begin
+insert into @numbers(number) values(@current)
+set @current =@current +1
+
+end 
+
+return 
+end
+
+SELECT * FROM dbo.tablevalued(5, 10);
+
+-- 7. Write a SQL query to return the Nth highest distinct salary from the Employee table. If there are fewer than N distinct salaries, return NULL.
+
+declare @n int =3
+
+select salary from (select salary,dense_rank() over(order by salary desc) as ranksalary
+from employee
+) as rankedsalaries
+
+where ranksalary =@n
+
+
+-- 8.  Write a SQL query to find the person who has the most friends.
+
+WITH AllFriends AS (
+    SELECT RequesterID AS UserID FROM dbo.RequestAccepted
+    UNION ALL
+    SELECT AccepterID AS UserID FROM dbo.RequestAccepted
+)
+SELECT TOP 1
+    UserID AS PersonID,
+    COUNT(*) AS TotalFriends
+FROM AllFriends
+GROUP BY UserID
+ORDER BY TotalFriends DESC;
+
+-- 9. Create a View for Customer Order Summary.
+
+select * from customers
+select * from orders
+
+CREATE VIEW vw_CustomerOrderSummary AS
+SELECT
+    c.customer_id,
+    c.name,
+    c.city,
+    COUNT(o.order_id) AS TotalOrders,
+    SUM(o.amount) AS TotalAmount
+FROM Customers c
+LEFT JOIN Orders o ON c.customer_id = o.customer_id
+GROUP BY c.customer_id, c.name, c.city;
+
+select * from vw_CustomerOrderSummary
+
+-- 10. Write an SQL statement to fill in the missing gaps. You have to write only select statement, no need to modify the table..
+
+
+select * from gaps
+
+SELECT
+    RowNumber,
+    MAX(TestCase) OVER (
+        ORDER BY RowNumber
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS TestCase_Filled
+FROM Gaps
+ORDER BY RowNumber;
